@@ -84,6 +84,11 @@ class DicomMetaDictionary {
       }
     }
   }
+
+  static getVR(tag) {
+    var punctuatedTag = DicomMetaDictionary.punctuateTag(tag);
+    return DicomMetaDictionary.dictionary[punctuatedTag].vr;
+  }
 }
 
 // Subset of those listed at:

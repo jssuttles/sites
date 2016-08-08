@@ -6,12 +6,12 @@ function toUTF8Array(str) {
         var charcode = str.charCodeAt(i);
         if (charcode < 0x80) utf8.push(charcode);
         else if (charcode < 0x800) {
-            utf8.push(0xc0 | (charcode >> 6), 
+            utf8.push(0xc0 | (charcode >> 6),
                       0x80 | (charcode & 0x3f));
         }
         else if (charcode < 0xd800 || charcode >= 0xe000) {
-            utf8.push(0xe0 | (charcode >> 12), 
-                      0x80 | ((charcode>>6) & 0x3f), 
+            utf8.push(0xe0 | (charcode >> 12),
+                      0x80 | ((charcode>>6) & 0x3f),
                       0x80 | (charcode & 0x3f));
         }
         // surrogate pair
@@ -22,9 +22,9 @@ function toUTF8Array(str) {
             // 20 bits of 0x0-0xFFFFF into two halves
             charcode = 0x10000 + (((charcode & 0x3ff)<<10)
                       | (str.charCodeAt(i) & 0x3ff))
-            utf8.push(0xf0 | (charcode >>18), 
-                      0x80 | ((charcode>>12) & 0x3f), 
-                      0x80 | ((charcode>>6) & 0x3f), 
+            utf8.push(0xf0 | (charcode >>18),
+                      0x80 | ((charcode>>12) & 0x3f),
+                      0x80 | ((charcode>>6) & 0x3f),
                       0x80 | (charcode & 0x3f));
         }
     }
@@ -49,11 +49,12 @@ function toFloat(val) {
 
 class BufferStream {
     constructor(sizeOrBuffer, littleEndian) {
-        this.buffer = typeof sizeOrBuffer == 'number' ? new ArrayBuffer(sizeOrBuffer) : sizeOrBuffer;
-        if (!this.buffer) {
-            this.buffer = new ArrayBuffer(0);
-        }
-        this.view = new DataView(this.buffer);
+        // this.buffer = typeof sizeOrBuffer == 'number' ? new ArrayBuffer(sizeOrBuffer) : sizeOrBuffer;
+        // if (!this.buffer) {
+        //     this.buffer = new ArrayBuffer(0);
+        // }
+        // this.view = new DataView(this.buffer);
+        this.buffer = this.view = typeof sizeOrBuffer == 'number' ? Buffer.alloc(sizeOrBuffer) : sizeOrBuffer;
         this.offset = 0;
         this.isLittleEndian = littleEndian || false;
         this.size = 0;
@@ -65,49 +66,73 @@ class BufferStream {
 
     writeUint8(value) {
         this.checkSize(1);
-        this.view.setUint8(this.offset, toInt(value));
+        this.view.writeUInt8(toInt(value), this.offset);
         return this.increment(1);
     }
 
     writeInt8(value) {
         this.checkSize(1);
-        this.view.setInt8(this.offset, toInt(value));
+        this.view.writeInt8(toInt(value), this.offset);
         return this.increment(1);
     }
 
     writeUint16(value) {
         this.checkSize(2);
-        this.view.setUint16(this.offset, toInt(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeUInt16LE(toInt(value), this.offset);
+        } else {
+          this.view.writeUInt16BE(toInt(value), this.offset);
+        }
         return this.increment(2);
     }
 
     writeInt16(value) {
         this.checkSize(2);
-        this.view.setInt16(this.offset, toInt(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeInt16LE(toInt(value), this.offset);
+        } else {
+          this.view.writeInt16BE(toInt(value), this.offset);
+        }
         return this.increment(2);
     }
 
     writeUint32(value) {
         this.checkSize(4);
-        this.view.setUint32(this.offset, toInt(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeUInt32LE(toInt(value), this.offset);
+        } else {
+          this.view.writeUInt32BE(toInt(value), this.offset);
+        }
         return this.increment(4);
     }
 
     writeInt32(value) {
         this.checkSize(4);
-        this.view.setInt32(this.offset, toInt(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeInt32LE(toInt(value), this.offset);
+        } else {
+          this.view.writeInt32BE(toInt(value), this.offset);
+        }
         return this.increment(4);
     }
 
     writeFloat(value) {
         this.checkSize(4);
-        this.view.setFloat32(this.offset, toFloat(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeFloatLE(toFloat(value), this.offset);
+        } else {
+          this.view.writeFloatBE(toFloat(value), this.offset);
+        }
         return this.increment(4);
     }
 
     writeDouble(value) {
         this.checkSize(8);
-        this.view.setFloat64(this.offset, toFloat(value), this.isLittleEndian);
+        if (this.isLittleEndian) {
+          this.view.writeDoubleLE(toFloat(value), this.offset);
+        } else {
+          this.view.writeDoubleBE(toFloat(value), this.offset);
+        }
         return this.increment(8);
     }
 
@@ -119,7 +144,7 @@ class BufferStream {
         this.checkSize(bytelen);
         var startOffset = this.offset;
         for (var i = 0;i < bytelen;i++) {
-            this.view.setUint8(startOffset, utf8[i]);
+            this.view.writeUInt8(utf8[i], startOffset);
             startOffset++;
         }
         return this.increment(bytelen);
@@ -138,32 +163,42 @@ class BufferStream {
             if (nextCode !== null) {
                 code = (code << 4) | nextCode;
             }
-            this.view.setUint8(startOffset, code);
+            this.view.writeUInt8(code, startOffset);
             startOffset++;
         }
         return this.increment(blen);
-    }    
+    }
 
     readUint32() {
-        var val = this.view.getUint32(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readUInt32LE(this.offset);
+        } else {
+          val = this.view.readUInt32BE(this.offset);
+        }
         this.increment(4);
         return val;
     }
 
     readUint16() {
-        var val = this.view.getUint16(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readUInt16LE(this.offset);
+        } else {
+          val = this.view.readUInt16BE(this.offset);
+        }
         this.increment(2);
         return val;
     }
 
     readUint8() {
-        var val = this.view.getUint8(this.offset);
+        var val = this.view.readUInt8(this.offset);
         this.increment(1);
         return val;
-    }    
+    }
 
     readUint8Array(length) {
-        var arr = new Uint8Array(this.buffer, this.offset, length);
+        var arr = this.buffer.slice(this.offset, length);
         this.increment(length);
         return arr;
     }
@@ -171,35 +206,61 @@ class BufferStream {
     readUint16Array(length) {
         var sixlen = length / 2, arr = new Uint16Array(sixlen), i = 0;
         while (i++ < sixlen) {
-            arr[i] = this.view.getUint16(this.offset, this.isLittleEndian);
+            var val;
+            if (this.isLittleEndian) {
+              val = this.view.readUInt16LE(this.offset);
+            } else {
+              val = this.view.readUInt16BE(this.offset);
+            }
+            arr[i] = val;
             this.offset += 2;
         }
         return arr;
     }
 
     readInt16() {
-        var val = this.view.getInt16(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readInt16LE(this.offset);
+        } else {
+          val = this.view.readInt16BE(this.offset);
+        }
         this.increment(2);
         return val;
     }
 
     readInt32() {
-        var val = this.view.getInt32(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readInt32LE(this.offset);
+        } else {
+          val = this.view.readInt32BE(this.offset);
+        }
         this.increment(4);
         return val;
     }
 
     readFloat() {
-        var val = this.view.getFloat32(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readFloatLE(this.offset);
+        } else {
+          val = this.view.readFloatBE(this.offset);
+        }
         this.increment(4);
         return val;
     }
 
     readDouble() {
-        var val = this.view.getFloat64(this.offset, this.isLittleEndian);
+        var val;
+        if (this.isLittleEndian) {
+          val = this.view.readDoubleBE(this.offset);
+        } else {
+          val = this.view.readDoubleLE(this.offset);
+        }
         this.increment(8);
         return val;
-    }    
+    }
 
     readString(length) {
         var string = '';
@@ -225,19 +286,23 @@ class BufferStream {
         if (this.offset + step > this.buffer.byteLength) {
             //throw new Error("Writing exceeded the size of buffer");
             //resize
-            var dst = new ArrayBuffer(this.buffer.byteLength * 2);
-            new Uint8Array(dst).set(new Uint8Array(this.buffer));
-            this.buffer = dst; 
-            this.view = new DataView(this.buffer);    
+            // var dst = new ArrayBuffer(this.buffer.byteLength * 2);
+            // new Uint8Array(dst).set(new Uint8Array(this.buffer));
+            // this.buffer = dst;
+            // this.view = new DataView(this.buffer);
+            var addition = ((this.buffer.byteLength > step) ? this.buffer.byteLength : (step * 2));
+            var newLength = this.buffer.byteLength + addition;
+            this.view = this.buffer = Buffer.concat([this.buffer, Buffer.alloc(addition)], newLength);
         }
     }
 
     concat(stream) {
-        var newbuf = new ArrayBuffer(this.offset + stream.size), int8 = new Uint8Array(newbuf);
-        int8.set(new Uint8Array(this.getBuffer(0, this.offset)));
-        int8.set(new Uint8Array(stream.getBuffer(0, stream.size)), this.offset);
-        this.buffer = newbuf;
-        this.view = new DataView(this.buffer);   
+        // var newbuf = new ArrayBuffer(this.offset + stream.size), int8 = new Uint8Array(newbuf);
+        // int8.set(new Uint8Array(this.getBuffer(0, this.offset)));
+        // int8.set(new Uint8Array(stream.getBuffer(0, stream.size)), this.offset);
+        // this.buffer = newbuf;
+        // this.view = new DataView(this.buffer);
+        this.buffer = this.view = Buffer.concat([this.getBuffer(0, this.offset), stream.getBuffer(0, stream.size)]);
         this.offset += stream.size;
         this.size = this.offset;
         return this.buffer.byteLength;
@@ -273,11 +338,11 @@ class BufferStream {
     reset() {
         this.offset = 0;
         return this;
-    }    
+    }
 
     end() {
         return this.offset >= this.buffer.byteLength;
-    }    
+    }
 
     toEnd() {
         this.offset = this.buffer.byteLength;
